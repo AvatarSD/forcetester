@@ -1,7 +1,7 @@
 #MicroXplorer Configuration settings - do not modify
 FREERTOS.FootprintOK=true
 FREERTOS.IPParameters=configTOTAL_HEAP_SIZE,Tasks01,FootprintOK,Queues01
-FREERTOS.Queues01=startStopEventQueue,8,StartStopEvent,NULL;mainDataSerialQueue,16,MainData,NULL;mainDataDiffDetectQueue,16,MainData,NULL
+FREERTOS.Queues01=startStopEventQueue,8,StartStopEvent,NULL
 FREERTOS.Tasks01=ledTask,-3,128,ledDefaultTask,Default,NULL,Dynamic,NULL,NULL;adsPooling,0,256,adsTask,Default,NULL,Dynamic,NULL,NULL;stopDiffDetect,0,128,stopDiffDetectButtonTask,Default,NULL,Dynamic,NULL,NULL;strtStpLinDetec,0,128,startStopLinearDetectTask,Default,NULL,Dynamic,NULL,NULL;serialOutput,0,256,serialOutputTask,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.configTOTAL_HEAP_SIZE=6000
 File.Version=6
