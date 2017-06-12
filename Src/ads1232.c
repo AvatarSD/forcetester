@@ -43,6 +43,7 @@ int32_t ADS_Value(ADS123x *data)
     }
     data->needCalib = false;
     if(adsVal > 0x7fffff) adsVal-=0xffffff;
+    adsVal-=data->offset;
     return adsVal;
 }
 

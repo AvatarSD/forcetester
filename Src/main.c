@@ -360,11 +360,12 @@ void ledDefaultTask(void const * argument)
 void adsTask(void const * argument)
 {
     /* USER CODE BEGIN adsTask */
+#define TARE_TIMES 250
 
     ADS123x ads1232 = {ADS_SCK_GPIO_Port, ADS_DATA_GPIO_Port,
-                       ADS_SCK_Pin, ADS_DATA_Pin, 0, false/*todo: true*/};
+                       ADS_SCK_Pin, ADS_DATA_Pin, 0, true};
     ADS_Init(&ads1232);
-    //todo: ADS_Tare(ads1232, TARE_TIMES);
+    ADS_Tare(&ads1232, TARE_TIMES);
 
     /* Infinite loop */
     for(;;)
@@ -425,14 +426,14 @@ void startStopLinearDetectTask(void const * argument)
 void serialOutputTask(void const * argument)
 {
     /* USER CODE BEGIN serialOutputTask */
-    uint32_t t = 0;
+
     /* Infinite loop */
     for(;;)
     {
         osEvent msg = osMailGet(mainDataSerialQueueHandle, 0);
         if(msg.status == osEventMail){
             char buff[30];
-            sprintf(buff, "%lu:!sd/66|%ld|%d\\\r\n",t++, ((MainData*)msg.value.p)->load, ((MainData*)msg.value.p)->pos);
+            sprintf(buff, "!sd/66|%ld|%d\\\r\n", ((MainData*)msg.value.p)->load, ((MainData*)msg.value.p)->pos);
             CDC_Transmit_FS((uint8_t*)buff, strlen(buff));
         }
         osMailFree(mainDataSerialQueueHandle, msg.value.p);
