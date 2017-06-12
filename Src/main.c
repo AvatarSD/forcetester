@@ -74,8 +74,8 @@ typedef struct{
 
 
 typedef enum{
-    StopEvent,
-    StartEvent
+    StopEvent = 35,
+    StartEvent = 78
 } StartStopEvent;
 
 #define ENCODER_VAL ((int16_t)htim3.Instance->CNT)
@@ -123,6 +123,7 @@ int main(void)
 
     /* USER CODE BEGIN 2 */
     /* init code for USB_DEVICE */
+    HAL_Delay(10);
     MX_USB_DEVICE_Init();
     HAL_Delay(50);
     HAL_GPIO_WritePin(ADS_PWRD_GPIO_Port, ADS_PWRD_Pin, GPIO_PIN_SET);
@@ -143,7 +144,7 @@ int main(void)
 
     /* Create the thread(s) */
     /* definition and creation of ledTask */
-    osThreadDef(ledTask, ledDefaultTask, osPriorityIdle, 0, 128);
+    osThreadDef(ledTask, ledDefaultTask, osPriorityNormal, 0, 128);
     ledTaskHandle = osThreadCreate(osThread(ledTask), NULL);
 
     /* definition and creation of adsPooling */
@@ -345,8 +346,6 @@ static void MX_GPIO_Init(void)
 /* ledDefaultTask function */
 void ledDefaultTask(void const * argument)
 {
-
-
     /* USER CODE BEGIN 5 */
     /* Infinite loop */
     for(;;)
@@ -370,20 +369,18 @@ void adsTask(void const * argument)
     /* Infinite loop */
     for(;;)
     {
-        osDelay(2);
-        /*
         int32_t load = ADS_Value(&ads1232);
         int16_t pos = ENCODER_VAL;
 
-        MainData * data = (MainData*)osMailAlloc(mainDataSerialQueueHandle, osWaitForever);
-        data->load = load;
-        data->pos = pos;
-        osMailPut(mainDataSerialQueueHandle, data);
+        MainData * serialMsg = (MainData*)osMailAlloc(mainDataSerialQueueHandle, 0);
+        serialMsg->load = load;
+        serialMsg->pos = pos;
+        osMailPut(mainDataSerialQueueHandle, serialMsg);
 
-        data = (MainData*)osMailAlloc(mainDataSerialQueueHandle, osWaitForever);
-        data->load = load;
-        data->pos = pos;
-        osMailPut(mainDataDiffDetectQueueHandle, data);*/
+        MainData * diffMsg = (MainData*)osMailAlloc(mainDataDiffDetectQueueHandle, 0);
+        diffMsg->load = load;
+        diffMsg->pos = pos;
+        osMailPut(mainDataDiffDetectQueueHandle, diffMsg);
     }
     /* USER CODE END adsTask */
 }
@@ -395,7 +392,16 @@ void stopDiffDetectButtonTask(void const * argument)
     /* Infinite loop */
     for(;;)
     {
-        osDelay(1);
+        osEvent msg = osMailGet(mainDataDiffDetectQueueHandle, 0);
+        if(msg.status == osEventMail){
+            //CDC_Transmit_FS((uint8_t*)"lo\r\n", 4);
+        }
+        osMailFree(mainDataDiffDetectQueueHandle, msg.value.p);
+
+        /*HAL_GPIO_WritePin(STOP_BUTTON_GPIO_Port, STOP_BUTTON_Pin, GPIO_PIN_SET);
+        osDelay(20);
+        HAL_GPIO_WritePin(STOP_BUTTON_GPIO_Port, STOP_BUTTON_Pin, GPIO_PIN_RESET);
+        osDelay(50);*/
     }
     /* USER CODE END stopDiffDetectButtonTask */
 }
@@ -408,9 +414,9 @@ void startStopLinearDetectTask(void const * argument)
     for(;;)
     {
         osMessagePut(startStopEventQueueHandle, StartEvent, 0);
-        osDelay(200);
+        osDelay(1000);
         osMessagePut(startStopEventQueueHandle, StopEvent, 0);
-        osDelay(800);
+        osDelay(2000);/**/
     }
     /* USER CODE END startStopLinearDetectTask */
 }
@@ -419,29 +425,27 @@ void startStopLinearDetectTask(void const * argument)
 void serialOutputTask(void const * argument)
 {
     /* USER CODE BEGIN serialOutputTask */
-
-    char buff[100];
-    osEvent msg;
-
+    uint32_t t = 0;
     /* Infinite loop */
     for(;;)
     {
-        msg = osMailGet(mainDataSerialQueueHandle, 0);
+        osEvent msg = osMailGet(mainDataSerialQueueHandle, 0);
         if(msg.status == osEventMail){
-            sprintf(buff, "Load: %ld  \t Pos: %d\r\n", ((MainData*)msg.value.p)->load, ((MainData*)msg.value.p)->pos);
+            char buff[30];
+            sprintf(buff, "%lu:!sd/66|%ld|%d\\\r\n",t++, ((MainData*)msg.value.p)->load, ((MainData*)msg.value.p)->pos);
             CDC_Transmit_FS((uint8_t*)buff, strlen(buff));
         }
         osMailFree(mainDataSerialQueueHandle, msg.value.p);
 
         msg = osMessageGet(startStopEventQueueHandle, 0);
-        if(msg.status == osEventMail){
-            StartStopEvent event = *((StartStopEvent*)msg.value.p);
+        if(msg.status == osEventMessage){
+            StartStopEvent event = msg.value.v;
             switch (event) {
             case StartEvent :
-                CDC_Transmit_FS((uint8_t*)"Machine was started!\r\n", 22);
+                CDC_Transmit_FS((uint8_t*)"!sd/12\\\r\n", 9);
                 break;
             case StopEvent :
-                CDC_Transmit_FS((uint8_t*)"Machine was stoped!\r\n", 21);
+                CDC_Transmit_FS((uint8_t*)"!sd/13\\\r\n", 9);
                 break;
             }
         }
