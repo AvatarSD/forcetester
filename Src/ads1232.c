@@ -1,4 +1,7 @@
 #include "ads1232.h"
+#include "cmsis_os.h"
+
+#define delay() for(uint32_t i = 0; i < 20; i++) __NOP();
 
 void ADS_Init(const ADS123x * data)
 {
@@ -18,22 +21,28 @@ void ADS_Init(const ADS123x * data)
 int32_t ADS_Value(ADS123x *data)
 {
     int32_t adsVal = 0;
-    while (HAL_GPIO_ReadPin(data->gpioData, data->pinData));
+    while (HAL_GPIO_ReadPin(data->gpioData, data->pinData)) osThreadYield();
+
     for (uint8_t i = 0; i < 24; i++)
     {
         HAL_GPIO_WritePin(data->gpioSck, data->pinSck, GPIO_PIN_SET);
         adsVal = adsVal << 1 ;
+        delay();
         if (HAL_GPIO_ReadPin(data->gpioData, data->pinData)) adsVal ++;
         HAL_GPIO_WritePin(data->gpioSck, data->pinSck, GPIO_PIN_RESET);
+        delay();
     }
-    if(data->needCalib)
+    for(uint8_t i = 0; i < 2; i++){
+        HAL_GPIO_TogglePin(data->gpioSck, data->pinSck);
+        delay();
+    }
+    if(data->needCalib){
         for(uint8_t i = 0; i < 4; i++)
-            HAL_GPIO_TogglePin(data->gpioData, data->pinData);
+            HAL_GPIO_TogglePin(data->gpioSck, data->pinSck);
+        delay();
+    }
     data->needCalib = false;
-
-    //todo
-    //adsVal = adsVal ^ 0x800000;
-
+    if(adsVal > 0x7fffff) adsVal-=0xffffff;
     return adsVal;
 }
 
