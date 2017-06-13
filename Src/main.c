@@ -60,11 +60,13 @@ osThreadId adsPoolingHandle;
 osThreadId stopDiffDetectHandle;
 osThreadId strtStpLinDetecHandle;
 osThreadId serialOutputHandle;
+osThreadId relayClickTaskHandle;
 osMessageQId startStopEventQueueHandle;
+
+/* USER CODE BEGIN PV */
 osMailQId mainDataSerialQueueHandle;
 osMailQId mainDataDiffDetectQueueHandle;
 
-/* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 
 typedef struct{
@@ -80,6 +82,13 @@ typedef enum{
 
 #define ENCODER_VAL ((int16_t)htim3.Instance->CNT)
 
+/*   Settings   */
+#define TARE_TIMES 250
+#define STOP_DIFF_THRESHOLD 3000
+#define STARTSTOP_THRESHOLD 4
+
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -92,6 +101,7 @@ void adsTask(void const * argument);
 void stopDiffDetectButtonTask(void const * argument);
 void startStopLinearDetectTask(void const * argument);
 void serialOutputTask(void const * argument);
+void relayTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -162,6 +172,10 @@ int main(void)
     /* definition and creation of serialOutput */
     osThreadDef(serialOutput, serialOutputTask, osPriorityNormal, 0, 256);
     serialOutputHandle = osThreadCreate(osThread(serialOutput), NULL);
+
+    /* definition and creation of relayClickTask */
+    osThreadDef(relayClickTask, relayTask, osPriorityNormal, 0, 128);
+    relayClickTaskHandle = osThreadCreate(osThread(relayClickTask), NULL);
 
     /* USER CODE BEGIN RTOS_THREADS */
     /* add threads, ... */
@@ -295,7 +309,7 @@ static void MX_TIM3_Init(void)
 
 }
 
-/** Configure pins as 
+/** Configure pins as
         * Analog
         * Input
         * Output
@@ -360,7 +374,6 @@ void ledDefaultTask(void const * argument)
 void adsTask(void const * argument)
 {
     /* USER CODE BEGIN adsTask */
-#define TARE_TIMES 250
 
     ADS123x ads1232 = {ADS_SCK_GPIO_Port, ADS_DATA_GPIO_Port,
                        ADS_SCK_Pin, ADS_DATA_Pin, 0, true};
@@ -391,18 +404,15 @@ void stopDiffDetectButtonTask(void const * argument)
 {
     /* USER CODE BEGIN stopDiffDetectButtonTask */
     /* Infinite loop */
+
+    int32_t lastVal = 0;
     for(;;)
     {
-        osEvent msg = osMailGet(mainDataDiffDetectQueueHandle, 0);
-        if(msg.status == osEventMail){
-            //CDC_Transmit_FS((uint8_t*)"lo\r\n", 4);
-        }
+        osEvent msg = osMailGet(mainDataDiffDetectQueueHandle, osWaitForever);
+        if(msg.status == osEventMail)
+            if((((MainData*)msg.value.p)->load - lastVal) > STOP_DIFF_THRESHOLD)
+                osSignalSet(relayClickTaskHandle, 0x01);
         osMailFree(mainDataDiffDetectQueueHandle, msg.value.p);
-
-        /*HAL_GPIO_WritePin(STOP_BUTTON_GPIO_Port, STOP_BUTTON_Pin, GPIO_PIN_SET);
-        osDelay(20);
-        HAL_GPIO_WritePin(STOP_BUTTON_GPIO_Port, STOP_BUTTON_Pin, GPIO_PIN_RESET);
-        osDelay(50);*/
     }
     /* USER CODE END stopDiffDetectButtonTask */
 }
@@ -452,6 +462,21 @@ void serialOutputTask(void const * argument)
         }
     }
     /* USER CODE END serialOutputTask */
+}
+
+/* relayTask function */
+void relayTask(void const * argument)
+{
+    /* USER CODE BEGIN relayTask */
+    /* Infinite loop */
+    for(;;)
+    {
+        osSignalWait (0x01, osWaitForever);
+        HAL_GPIO_WritePin(STOP_BUTTON_GPIO_Port, STOP_BUTTON_Pin, GPIO_PIN_SET);
+        osDelay(100);
+        HAL_GPIO_WritePin(STOP_BUTTON_GPIO_Port, STOP_BUTTON_Pin, GPIO_PIN_RESET);
+    }
+    /* USER CODE END relayTask */
 }
 
 /**
@@ -516,6 +541,6 @@ void assert_failed(uint8_t* file, uint32_t line)
 
 /**
   * @}
-*/ 
+*/
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
